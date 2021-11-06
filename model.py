@@ -43,6 +43,13 @@ class STTModel(nn.Module):
         x = self.fc(x)
         return x, (hn, cn)
 
+    def recognize(self, x, hn, c0):
+        outputs, _ = self(x, (hn, c0))
+        outputs = torch.nn.functional.log_softmax(outputs, dim=2)
+        outputs = outputs.transpose(0,1)
+        #arg_maxes = torch.argmax(outputs[0], dim=1)
+        return outputs
+
     @staticmethod
     def get_initial_hidden(batch_size):
         n, hs = 1, 256

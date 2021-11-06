@@ -4,12 +4,34 @@ import torchaudio
 import string
 import csv
 import random
-
+from ctcdecode import CTCBeamDecoder
 
 LABELS = {letter:i+2 for i, letter in enumerate(string.ascii_lowercase)}
 LABELS[' '] = 1
 LABELS['_'] = 0
 LABEL_INDICES = {v:k for k,v in LABELS.items()}
+
+class Preprocessor(torchaudio.transforms.MelSpectrogram):
+    def __init__(self):
+        super(Preprocessor, self).__init__(n_mels=81, win_length=160, hop_length=80)
+
+class LanaguageModelDecoder(CTCBeamDecoder):
+    def __init__(self, language_model_path):
+        super(LanaguageModelDecoder, self).__init__(
+            [LABEL_INDICES[i] for i in range(len(LABEL_INDICES))],
+            model_path=language_model_path,
+            alpha=0.52272,
+            beta=0.96505,
+            log_probs_input=True
+            )
+
+    def decode(self, x, num_top_results=5):
+        beam_results, _, _, out_lens = super(LanaguageModelDecoder, self).decode(x)
+        top_results = []
+        for j in range(5):
+            top_results.append(
+                "".join(LABEL_INDICES[n.item()] for n in beam_results[0][j][:out_lens[0][j]]))
+        return top_results
 
 class Augment(nn.Module):
     def __init__(self):
@@ -36,14 +58,13 @@ class Dataset(torch.utils.data.Dataset):
                 if i > 0:
                     self.data_table.append(row)
 
-        self.mel_spectrogram = torchaudio.transforms.MelSpectrogram(n_mels=81,
-                win_length=160, hop_length=80)
+        self.preprocessor = Preprocessor()
 
         if validation:
-            self.process = nn.Sequential(self.mel_spectrogram)
+            self.process = nn.Sequential(self.preprocessor)
         else:
             self.process = nn.Sequential(
-                    self.mel_spectrogram,
+                    self.preprocessor,
                     Augment())
 
     def __len__(self):
