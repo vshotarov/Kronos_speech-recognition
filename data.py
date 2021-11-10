@@ -5,6 +5,8 @@ import string
 import csv
 import random
 from ctcdecode import CTCBeamDecoder
+import os
+
 
 LABELS = {letter:i+2 for i, letter in enumerate(string.ascii_lowercase)}
 LABELS[' '] = 1
@@ -47,9 +49,10 @@ class Augment(nn.Module):
         return x
 
 class Dataset(torch.utils.data.Dataset):
-    def __init__(self, csv_path, validation=False):
+    def __init__(self, csv_path, validation=False, wav_files_path="resampled_audio"):
         super(Dataset, self).__init__()
 
+        self.wav_files_path = wav_files_path
         self.validation = validation
         self.data_table = []
         with open(csv_path, newline='') as csvfile:
@@ -72,7 +75,7 @@ class Dataset(torch.utils.data.Dataset):
 
     def __getitem__(self, idx):
         audio, _bytes, transcript = self.data_table[idx]
-        waveform, _ = torchaudio.load("resampled_audio/"+audio)
+        waveform, _ = torchaudio.load(os.path.join(self.wav_files_path, audio))
 
         waveform, _ = torchaudio.sox_effects.apply_effects_tensor(waveform, 8000,
                 [["gain", "-n"]])
